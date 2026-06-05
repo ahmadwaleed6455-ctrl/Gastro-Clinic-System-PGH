@@ -167,7 +167,7 @@ if page == "🏥 Dashboard & Form":
                 else:
                     st.warning("No patients entered today yet.")
             
-            with tab_receipt:
+           with tab_receipt:
                 st.subheader("Select a Patient to view/print their individual official receipt:")
                 patient_options = df_master.sort_values(by="timestamp", ascending=False)
                 patient_select = st.selectbox(
@@ -177,7 +177,9 @@ if page == "🏥 Dashboard & Form":
                 )
                 
                 if patient_select:
-                    p_info = df_master[df_master['receipt_no'] == patient_select].iloc
+                    # FIX: Using .iloc safely by ensuring we isolate the matching row explicitly
+                    matching_rows = df_master[df_master['receipt_no'] == patient_select]
+                    p_info = matching_rows.iloc
                     
                     st.markdown(f"""
                     <div style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
@@ -188,18 +190,15 @@ if page == "🏥 Dashboard & Form":
                         <p><b>Patient Name:</b> {p_info['patient_name']}</p>
                         <p><b>Procedure Performed:</b> {p_info['procedure']}</p>
                         <hr style="border-top:1px dashed #ced4da;">
-                        <p>Appointment Charges: <span style="float:right;">Rs. {p_info['appt_fee']:,.0f}</span></p>
-                        <p>Procedure Charges: <span style="float:right;">Rs. {p_info['procedure_fee']:,.0f}</span></p>
-                        <h4 style="margin-bottom:5px;">Total Amount: <span style="float:right;">Rs. {p_info['actual_amount']:,.0f}</span></h4>
-                        <p style="color:green; margin-top:0;">Paid Amount: <span style="float:right;">Rs. {p_info['paid_amount']:,.0f}</span></p>
-                        <p style="color:red; margin-top:0;">Refund Distributed: <span style="float:right;">Rs. {p_info['refund']:,.0f}</span></p>
+                        <p>Appointment Charges: <span style="float:right;">Rs. {float(p_info['appt_fee']):,.0f}</span></p>
+                        <p>Procedure Charges: <span style="float:right;">Rs. {float(p_info['procedure_fee']):,.0f}</span></p>
+                        <h4 style="margin-bottom:5px;">Actual Total Amount: <span style="float:right;">Rs. {float(p_info['actual_amount']):,.0f}</span></h4>
+                        <p style="color:green; margin-top:0; margin-bottom:5px;">Paid Amount: <span style="float:right;">Rs. {float(p_info['paid_amount']):,.0f}</span></p>
+                        <p style="color:red; margin-top:0; margin-bottom:5px;"><b>Refund Disbursed (By Dr. Order):</b> <span style="float:right;">Rs. {float(p_info['refund']):,.0f}</span></p>
                         <hr style="border-top: 2px solid #008080;">
-                        <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {p_info['balance']:,.0f}</span></h3>
+                        <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {float(p_info['balance']):,.0f}</span></h3>
                     </div>
                     """, unsafe_allow_html=True)
-        else:
-            st.info("No records logged in the Cloud Database yet.")
-
 # ----------------------------------------------------
 # PAGE 2: DATE-RANGE AUDITOR ARCHIVE
 # ----------------------------------------------------
