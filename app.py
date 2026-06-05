@@ -44,10 +44,11 @@ receipt_date_suffix = datetime.now().strftime("%d%m%Y")
 def generate_receipt_number():
     # Query Firebase to count records matching today's date string
     docs = db_collection.where("date", "==", current_date_str).stream()
-    count = sum(1 for _ docs)
+    # Fixed syntax: added the 'in' keyword back into the list comprehension
+    count = sum(1 for _ in docs)
     next_index = count + 1
     return f"GNA{receipt_date_suffix}{next_index}"
-
+    
 # Auto-generate receipt number for this instant session
 auto_receipt_no = generate_receipt_number()
 
