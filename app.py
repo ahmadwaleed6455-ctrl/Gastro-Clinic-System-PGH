@@ -73,8 +73,7 @@ if page == "🏥 Dashboard & Form":
     st.markdown("---")
     
     col_form, col_display = st.columns(2)
-    
-    with col_form:
+with col_form:
         st.header("📋 Patient Entry Form")
         with st.form(key="patient_entry_form", clear_on_submit=True):
             st.info(f"**Date/Time:** {display_datetime_form} \n\n **Receipt No:** `{auto_receipt_no}`")
@@ -121,7 +120,7 @@ if page == "🏥 Dashboard & Form":
                     st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
                     st.rerun()
 
-    with col_display:
+with col_display:
     st.header("📊 Live Worksheet (New entries add to the BOTTOM)")
 
     try:
