@@ -257,7 +257,7 @@ elif page == "💸 Issue Patient Refund":
             matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
             
             if not matching_rows.empty:
-                p_data = matching_rows.iloc.to_dict()
+                p_info = matching_rows.iloc[0].to_dict()
                 
                 # Highlight current balance status
                 current_bal = float(p_data.get('balance', 0))
