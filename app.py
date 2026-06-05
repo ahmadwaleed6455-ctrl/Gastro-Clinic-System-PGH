@@ -199,6 +199,27 @@ if page == "🏥 Dashboard & Form":
                         """
                         
                         components.html(receipt_html, height=450, scrolling=True)
+                        # --- ADD PRIVACY DELETION PANEL HERE ---
+                        st.markdown("---")
+                        st.subheader("🗑️ Delete This Record")
+                        
+                        # Password protection input field
+                        delete_password = st.text_input("Enter Admin Password to Delete This Record", type="password", key=f"del_pwd_{selected_receipt_no}")
+                        
+                        if delete_password == "5781":
+                            st.warning(f"Are you sure you want to permanently delete receipt {selected_receipt_no}?")
+                            confirm_delete = st.checkbox("Yes, I confirm deletion", key=f"del_chk_{selected_receipt_no}")
+                            
+                            if st.button("🔥 Confirm Hard Delete", key=f"del_btn_{selected_receipt_no}"):
+                                if confirm_delete:
+                                    # Erase from Cloud Firebase Database
+                                    log_ref.document(selected_receipt_no).delete()
+                                    st.success(f"Record {selected_receipt_no} has been successfully deleted.")
+                                    st.rerun()
+                                else:
+                                    st.info("Please check the confirmation checkbox first.")
+                        elif delete_password != "":
+                            st.error("Incorrect password. Access denied.")
         else:
             st.info("No records logged in the Cloud Database yet.")
             
