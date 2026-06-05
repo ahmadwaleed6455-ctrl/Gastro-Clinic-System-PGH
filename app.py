@@ -187,7 +187,7 @@ if page == "🏥 Dashboard & Form":
                     matching_rows = df_master[df_master['receipt_no'] == selected_receipt_no]
                     
                     if not matching_rows.empty:
-                        p_info = matching_rows.iloc.to_dict()
+                        p_info = matching_rows.iloc[0].to_dict()
                         
                         receipt_html = f"""
                         <div id="print-area" style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
