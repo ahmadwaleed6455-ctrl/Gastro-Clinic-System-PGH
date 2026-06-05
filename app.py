@@ -166,8 +166,8 @@ if page == "🏥 Dashboard & Form":
                     st.text_area("Copy/Send to Printer", value=summary_text, height=220)
                 else:
                     st.warning("No patients entered today yet.")
-            
-           with tab_receipt:
+
+            with tab_receipt:
                 st.subheader("Select a Patient to view/print their individual official receipt:")
                 patient_options = df_master.sort_values(by="timestamp", ascending=False)
                 patient_select = st.selectbox(
@@ -199,6 +199,8 @@ if page == "🏥 Dashboard & Form":
                         <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {float(p_info['balance']):,.0f}</span></h3>
                     </div>
                     """, unsafe_allow_html=True)
+
+           
 # ----------------------------------------------------
 # PAGE 2: DATE-RANGE AUDITOR ARCHIVE
 # ----------------------------------------------------
