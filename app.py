@@ -58,7 +58,7 @@ auto_receipt_no = generate_receipt_number()
 st.title("🏥 Gastro Dr. Naveed Anwar Clinic Management System (Cloud Powered)")
 st.markdown("---")
 
-col_form, col_display = st.columns()
+col_form, col_display = st.columns(2)
 
 # --- LEFT COLUMN: DATA ENTRY FORM ---
 with col_form:
