@@ -183,7 +183,7 @@ if page == "🏥 Dashboard & Form":
                 selected_option = st.selectbox("Choose Patient Folder", options=clean_dropdown_options)
                 
                 if selected_option:
-                    selected_receipt_no = selected_option.split(" | ")
+                    selected_receipt_no = str(selected_option.split(" | ")[0]).strip()
                     matching_rows = df_master[df_master['receipt_no'] == selected_receipt_no]
                     
                     if not matching_rows.empty:
