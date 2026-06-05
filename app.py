@@ -182,7 +182,7 @@ if page == "🏥 Dashboard & Form":
                     
                     if not matching_rows.empty:
                         # Convert the single row directly into a clean Python dictionary
-                        p_info = matching_rows.iloc.to_dict()
+                        p_info = matching_rows.iloc[0].to_dict()
                         
                         st.markdown(f"""
                         <div style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
