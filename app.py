@@ -61,8 +61,24 @@ def generate_receipt_number():
 auto_receipt_no = generate_receipt_number()
 
 # ----------------------------------------------------
-# 🧭 MULTI-PAGE NAVIGATION BAR
+# 📊 SIDEBAR LIVE METRIC (NEW)
 # ----------------------------------------------------
+try:
+    all_docs = log_ref.stream()
+    all_data = [doc.to_dict() for doc in all_docs]
+    if all_data:
+        df_sidebar = pd.DataFrame(all_data)
+        total_outstanding_balance = float(df_sidebar.get('balance', pd.Series()).sum())
+    else:
+        total_outstanding_balance = 0.0
+except Exception:
+    total_outstanding_balance = 0.0
+
+st.sidebar.markdown("### 💳 Clinic Financial Status")
+st.sidebar.metric("Total Outstanding Balance", f"Rs. {total_outstanding_balance:,.0f}")
+st.sidebar.markdown("---")
+
+# 🧭 MULTI-PAGE NAVIGATION BAR
 page = st.sidebar.radio("Navigate System Pages", ["🏥 Dashboard & Form", "💸 Issue Patient Refund", "🔍 Date-Range Auditor", "⚙️ Procedure Price Settings"])
 
 # ----------------------------------------------------
@@ -72,37 +88,40 @@ if page == "🏥 Dashboard & Form":
     st.title("🏥 Gastro Dr. Naveed Anwar Clinic Management System")
     st.markdown("---")
     
-    col_form, col_display = st.columns(2)
+    col_form, col_display = st.columns()
     
     with col_form:
         st.header("📋 Patient Entry Form")
+        
+        # We handle layout elements inside a dynamic container block to reflect value alterations instantly
+        st.info(f"**Date/Time:** {display_datetime_form} \n\n **Receipt No:** `{auto_receipt_no}`")
+        
+        patient_name = st.text_input("Patient Name *", placeholder="Enter patient's full name")
+        selected_procedure = st.selectbox("Select Procedure", list(PROCEDURE_FEES.keys()))
+        
+        calculated_proc_fee = PROCEDURE_FEES[selected_procedure]
+        actual_total = APPT_FEE + calculated_proc_fee
+        
+        st.markdown(f"""
+        * **Appointment Fee:** Rs. {APPT_FEE:,.0f}
+        * **Procedure Fee:** Rs. {calculated_proc_fee:,.0f}
+        * **Actual Total Amount:** **Rs. {actual_total:,.0f}**
+        """)
+        
+        # FIX: The form submit utilizes interactive widgets directly linked to the actual_total auto-calculated value
         with st.form(key="patient_entry_form", clear_on_submit=True):
-            st.info(f"**Date/Time:** {display_datetime_form} \n\n **Receipt No:** `{auto_receipt_no}`")
-            
-            patient_name = st.text_input("Patient Name *", placeholder="Enter patient's full name")
-            selected_procedure = st.selectbox("Select Procedure", list(PROCEDURE_FEES.keys()))
-            
-            calculated_proc_fee = PROCEDURE_FEES[selected_procedure]
-            actual_total = APPT_FEE + calculated_proc_fee
-            
-            st.markdown(f"""
-            * **Appointment Fee:** Rs. {APPT_FEE:,.0f}
-            * **Procedure Fee:** Rs. {calculated_proc_fee:,.0f}
-            * **Actual Total Amount:** **Rs. {actual_total:,.0f}**
-            """)
-            
             paid_amount = st.number_input("Paid Amount (Rs.)", min_value=0.0, step=500.0, value=actual_total)
-            refund_amount = st.number_input("Refund Amount (Rs.)", min_value=0.0, step=500.0, value=0.0)
             
-            calculated_balance = actual_total - paid_amount + refund_amount
-            st.markdown(f"**Calculated Balance:** Rs. {calculated_balance:,.0f}")
-            
+            # Form actions pass processing instructions downstream
             submit_button = st.form_submit_button(label="Save Record & Auto-Reset")
             
             if submit_button:
                 if not patient_name.strip():
                     st.error("Submission failed! Patient Name is required.")
                 else:
+                    # Balance calculation without legacy front-page inputs
+                    calculated_balance = actual_total - paid_amount
+                    
                     patient_data = {
                         "receipt_no": auto_receipt_no,
                         "date": current_date_str,
@@ -114,14 +133,11 @@ if page == "🏥 Dashboard & Form":
                         "procedure_fee": calculated_proc_fee,
                         "actual_amount": actual_total,
                         "paid_amount": paid_amount,
-                        "refund": refund_amount,
+                        "refund": 0.0, # Removed layout field, defaults to zero on new patient
                         "balance": calculated_balance
                     }
                     log_ref.document(auto_receipt_no).set(patient_data)
                     st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
-                    
-                    # reset receipt safely
-                    st.session_state["receipt_no"] = generate_receipt_number()
                     st.rerun()
 
     with col_display:
@@ -133,12 +149,10 @@ if page == "🏥 Dashboard & Form":
         if data_list:
             df_master = pd.DataFrame(data_list)
             
-            # --- PASTE THE FIX HERE ---
             if 'datetime_str' not in df_master.columns:
                 df_master['datetime_str'] = df_master['date']
             else:
                 df_master['datetime_str'] = df_master['datetime_str'].fillna(df_master['date'])
-            # ---------------------------
 
             df_master['date_parsed'] = pd.to_datetime(df_master['date'])
             today_start = pd.Timestamp(datetime.now().date())
@@ -161,7 +175,6 @@ if page == "🏥 Dashboard & Form":
             with tab_receipt:
                 st.subheader("Select a Patient Receipt:")
                 
-                # SAFE dropdown creation (no index crash)
                 clean_dropdown_options = [
                     f"{row['receipt_no']} | {row['patient_name']}"
                     for _, row in df_master.iterrows()
@@ -170,12 +183,11 @@ if page == "🏥 Dashboard & Form":
                 selected_option = st.selectbox("Choose Patient Folder", options=clean_dropdown_options)
                 
                 if selected_option:
-                    selected_receipt_no = selected_option.split(" | ")[0]
-                    
+                    selected_receipt_no = selected_option.split(" | ")
                     matching_rows = df_master[df_master['receipt_no'] == selected_receipt_no]
                     
                     if not matching_rows.empty:
-                        p_info = matching_rows.iloc[0].to_dict()
+                        p_info = matching_rows.iloc.to_dict()
                         
                         receipt_html = f"""
                         <div id="print-area" style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
@@ -197,13 +209,11 @@ if page == "🏥 Dashboard & Form":
                         <br/>
                         <button onclick="window.print()" style="background-color:#008080; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">🖨️ Click Here to Print Receipt</button>
                         """
-                        
                         components.html(receipt_html, height=450, scrolling=True)
-                        # --- ADD PRIVACY DELETION PANEL HERE ---
+                        
                         st.markdown("---")
                         st.subheader("🗑️ Delete This Record")
                         
-                        # Password protection input field
                         delete_password = st.text_input("Enter Admin Password to Delete This Record", type="password", key=f"del_pwd_{selected_receipt_no}")
                         
                         if delete_password == "5781":
@@ -212,7 +222,6 @@ if page == "🏥 Dashboard & Form":
                             
                             if st.button("🔥 Confirm Hard Delete", key=f"del_btn_{selected_receipt_no}"):
                                 if confirm_delete:
-                                    # Erase from Cloud Firebase Database
                                     log_ref.document(selected_receipt_no).delete()
                                     st.success(f"Record {selected_receipt_no} has been successfully deleted.")
                                     st.rerun()
@@ -244,14 +253,11 @@ elif page == "💸 Issue Patient Refund":
         target_selection = st.selectbox("Search Receipt/Patient Name", options=clean_dropdown_options)
         
         if target_selection:
-            # FIX 1: correct receipt extraction
-            target_receipt = target_selection.split(" | ")[0]
-            
-            # FIX 2: safe filtering
+            target_receipt = target_selection.split(" | ")
             matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
             
             if not matching_rows.empty:
-                p_data = matching_rows.iloc[0].to_dict()
+                p_data = matching_rows.iloc.to_dict()
                 
                 st.write("**Current Registered Record Details:**")
                 st.json({
@@ -273,7 +279,6 @@ elif page == "💸 Issue Patient Refund":
                     submit_refund = st.form_submit_button("Save Refund Changes to Cloud")
                     
                     if submit_refund:
-                        # FIX 3: safe numeric conversion
                         actual_amount = float(p_data.get('actual_amount', 0))
                         paid_amount = float(p_data.get('paid_amount', 0))
                         
@@ -288,7 +293,6 @@ elif page == "💸 Issue Patient Refund":
                             f"Balances updated successfully for {p_data.get('patient_name','')}! "
                             f"New Balance: Rs. {updated_balance:,.0f}"
                         )
-                        
                         st.rerun()
             else:
                 st.warning("No matching patient record found for selected receipt.")
@@ -307,8 +311,6 @@ elif page == "🔍 Date-Range Auditor":
     
     if data_list:
         df_audit = pd.DataFrame(data_list)
-        
-        # FIX: safe date parsing
         df_audit['date_parsed'] = pd.to_datetime(
             df_audit['date'],
             errors='coerce'
@@ -319,8 +321,6 @@ elif page == "🔍 Date-Range Auditor":
         end_date = c2.date_input("To Date", datetime.now().date())
         
         if start_date <= end_date:
-            
-            # FIX: safe filtering (handles NaT properly)
             filtered_df = df_audit[
                 (df_audit['date_parsed'].notna()) &
                 (df_audit['date_parsed'] >= start_date) &
@@ -334,17 +334,17 @@ elif page == "🔍 Date-Range Auditor":
                 
                 a1.metric(
                     "Total Appointment Fees",
-                    f"Rs. {filtered_df.get('appt_fee', pd.Series([0])).sum():,.0f}"
+                    f"Rs. {filtered_df.get('appt_fee', pd.Series()).sum():,.0f}"
                 )
                 
                 a2.metric(
                     "Total Surgery/Proc Billings",
-                    f"Rs. {filtered_df.get('procedure_fee', pd.Series([0])).sum():,.0f}"
+                    f"Rs. {filtered_df.get('procedure_fee', pd.Series()).sum():,.0f}"
                 )
                 
                 a3.metric(
                     "Grand Cash Collected",
-                    f"Rs. {filtered_df.get('paid_amount', pd.Series([0])).sum():,.0f}"
+                    f"Rs. {filtered_df.get('paid_amount', pd.Series()).sum():,.0f}"
                 )
                 
                 a4.metric(
@@ -370,14 +370,13 @@ elif page == "🔍 Date-Range Auditor":
                 
                 drop_cols = [c for c in ['timestamp', 'date_parsed'] if c in filtered_df.columns]
                 st.dataframe(filtered_df.drop(columns=drop_cols), use_container_width=True, hide_index=True)
-            
             else:
                 st.warning("No clinic documents match the selected date constraints.")
         else:
             st.error("Start date must be before or equal to end date.")
-    
     else:
         st.info("No data available in database.")
+
 # ----------------------------------------------------
 # PAGE 4: PRICING SETTINGS MANAGER (FIXED)
 # ----------------------------------------------------
@@ -396,8 +395,6 @@ elif page == "⚙️ Procedure Price Settings":
         updated_fees = {"appt_fee": new_appt}
         
         for proc, current_fee in PROCEDURE_FEES.items():
-            
-            # FIX: safe float conversion
             safe_fee = float(current_fee) if current_fee is not None else 0.0
             
             if proc != "None (Consultation Only)":
@@ -413,9 +410,6 @@ elif page == "⚙️ Procedure Price Settings":
         save_settings = st.form_submit_button("Update Rates Globally")
         
         if save_settings:
-            
-            # FIX: avoid partial overwrite issues
             settings_ref.document("pricing").set(updated_fees, merge=True)
-            
             st.success("Clinic pricing configurations synchronized successfully!")
             st.rerun()
