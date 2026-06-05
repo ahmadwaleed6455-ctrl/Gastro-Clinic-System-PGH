@@ -233,7 +233,7 @@ if page == "🏥 Dashboard & Form":
             st.info("No records logged in the Cloud Database yet.")
             
 # ----------------------------------------------------
-# PAGE 2: PAYMENT & REFUND ADJUSTMENT PANEL (UPDATED)
+# PAGE 2: PAYMENT & REFUND ADJUSTMENT PANEL (FIXED)
 # ----------------------------------------------------
 elif page == "💸 Issue Patient Refund":
     st.title("💸 Patient Payment & Refund Adjustment Panel")
@@ -253,14 +253,20 @@ elif page == "💸 Issue Patient Refund":
         target_selection = st.selectbox("Search Receipt/Patient Name", options=clean_dropdown_options)
         
         if target_selection:
-            target_receipt = target_selection.split(" | ")
+            
+            # FIX 1: correct string extraction (NOT list)
+            target_receipt = target_selection.split(" | ")[0]
+            
             matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
             
             if not matching_rows.empty:
-                p_info = matching_rows.iloc[0].to_dict()
                 
-                # Highlight current balance status
+                # FIX 2: correct iloc usage
+                p_data = matching_rows.iloc[0].to_dict()
+                
+                # Safe balance handling
                 current_bal = float(p_data.get('balance', 0))
+                
                 if current_bal > 0:
                     st.warning(f"⚠️ This patient has an outstanding balance of **Rs. {current_bal:,.0f}**")
                 else:
@@ -276,13 +282,13 @@ elif page == "💸 Issue Patient Refund":
                 })
                 
                 with st.form("refund_update_form"):
-                    # NEW: Input to change how much they have paid overall
+                    
                     updated_paid = st.number_input(
                         "Update Total Paid Amount (Rs.)",
                         min_value=0.0,
                         value=float(p_data.get('paid_amount', 0)),
                         step=500.0,
-                        help="Increase this amount when the patient pays their remaining balance."
+                        help="Increase this amount when patient pays remaining balance."
                     )
                     
                     new_refund = st.number_input(
@@ -295,9 +301,10 @@ elif page == "💸 Issue Patient Refund":
                     submit_adjustments = st.form_submit_button("Save Changes to Cloud")
                     
                     if submit_adjustments:
+                        
                         actual_amount = float(p_data.get('actual_amount', 0))
                         
-                        # Recalculate balance strictly using the new paid value
+                        # Recalculate balance correctly
                         updated_balance = actual_amount - updated_paid + new_refund
                         
                         log_ref.document(target_receipt).update({
@@ -308,8 +315,10 @@ elif page == "💸 Issue Patient Refund":
                         
                         st.success(
                             f"Ledger updated successfully for {p_data.get('patient_name','')}! "
-                            f"New Paid Total: Rs. {updated_paid:,.0f} | Remaining Balance: Rs. {updated_balance:,.0f}"
+                            f"New Paid Total: Rs. {updated_paid:,.0f} | "
+                            f"Remaining Balance: Rs. {updated_balance:,.0f}"
                         )
+                        
                         st.rerun()
             else:
                 st.warning("No matching patient record found for selected receipt.")
