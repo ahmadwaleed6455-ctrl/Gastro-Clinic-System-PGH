@@ -72,7 +72,7 @@ if page == "🏥 Dashboard & Form":
     st.title("🏥 Gastro Dr. Naveed Anwar Clinic Management System")
     st.markdown("---")
     
-    col_form, col_display = st.columns()
+    col_form, col_display = st.columns(2)
     
     with col_form:
         st.header("📋 Patient Entry Form")
