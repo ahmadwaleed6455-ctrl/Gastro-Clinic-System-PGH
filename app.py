@@ -127,16 +127,23 @@ if page == "🏥 Dashboard & Form":
     with col_display:
         st.header("📊 Live Worksheet (New entries add to the BOTTOM)")
         
-        docs = log_ref.stream()
+        docs = log_ref.order_by("timestamp", direction=firestore.Query.ASCENDING).stream()
         data_list = [doc.to_dict() for doc in docs]
         
         if data_list:
             df_master = pd.DataFrame(data_list)
             
-            df_master['date_parsed'] = pd.to_datetime(df_master['date'], errors='coerce').dt.date
-            today = datetime.now().date()
-            df_today = df_master[df_master['date_parsed'] == today]
-            
+            # --- PASTE THE FIX HERE ---
+            if 'datetime_str' not in df_master.columns:
+                df_master['datetime_str'] = df_master['date']
+            else:
+                df_master['datetime_str'] = df_master['datetime_str'].fillna(df_master['date'])
+            # ---------------------------
+
+            df_master['date_parsed'] = pd.to_datetime(df_master['date'])
+            today_start = pd.Timestamp(datetime.now().date())
+            df_today = df_master[df_master['date_parsed'] >= today_start]
+                    
             tab_today, tab_receipt = st.tabs(["📅 Today's Live Records", "🧾 Patient Receipt Generator Viewer"])
             
             with tab_today:
