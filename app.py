@@ -390,9 +390,17 @@ with col_display:
 
 # ----------------------------------------------------
 
+if page == "🏥 Dashboard & Form":
+    ...
+    with col_display:
+        ...
 elif page == "💸 Issue Patient Refund":
+    ...
+elif page == "🔍 Date-Range Auditor":
+    ...
+elif page == "⚙️ Procedure Price Settings":
+    ...
 
-```
 st.title("💸 Doctor Approved Refund Manager Panel")
 st.markdown("---")
 
