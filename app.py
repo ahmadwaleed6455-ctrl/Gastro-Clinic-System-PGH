@@ -5,12 +5,14 @@ from google.oauth2 import service_account
 from google.cloud import firestore
 import streamlit.components.v1 as components
 
-# Set page config
+# -------------------------------
+# PAGE CONFIG
+# -------------------------------
 st.set_page_config(page_title="Gastro Dr. Naveed Anwar - Clinic Portal", layout="wide")
 
-# ----------------------------------------------------
-# 🔐 FIREBASE CONNECTION
-# ----------------------------------------------------
+# -------------------------------
+# FIREBASE CONNECTION
+# -------------------------------
 @st.cache_resource
 def get_firestore_client():
     key_dict = dict(st.secrets["textkey"])
@@ -22,9 +24,9 @@ db = get_firestore_client()
 log_ref = db.collection("patient_log")
 settings_ref = db.collection("clinic_settings")
 
-# ----------------------------------------------------
-# ⚙️ DYNAMIC PRICING ENGINE
-# ----------------------------------------------------
+# -------------------------------
+# PRICING ENGINE
+# -------------------------------
 def get_clinic_fees():
     defaults = {
         "appt_fee": 2500.0,
@@ -35,6 +37,7 @@ def get_clinic_fees():
         "ERCP": 25000.0,
         "PEG Tube": 15000.0
     }
+
     doc = settings_ref.document("pricing").get()
     if doc.exists:
         return doc.to_dict()
@@ -46,261 +49,215 @@ FEES = get_clinic_fees()
 APPT_FEE = FEES.get("appt_fee", 2500.0)
 PROCEDURE_FEES = {k: v for k, v in FEES.items() if k != "appt_fee"}
 
-# ----------------------------------------------------
-# 🕒 TIME & AUTO-RECEIPT GENERATOR
-# ----------------------------------------------------
-current_date_str = datetime.now().strftime("%Y-%m-%d")
-display_datetime_form = datetime.now().strftime("%d-%m-%Y %I:%M %p")
-receipt_date_suffix = datetime.now().strftime("%d%m%Y")
+# -------------------------------
+# DATE HANDLING
+# -------------------------------
+now = datetime.now()
+current_date_str = now.strftime("%Y-%m-%d")
+display_datetime_form = now.strftime("%d-%m-%Y %I:%M %p")
+receipt_date_suffix = now.strftime("%d%m%Y")
 
+# -------------------------------
+# FIXED RECEIPT GENERATOR (SESSION SAFE)
+# -------------------------------
 def generate_receipt_number():
     docs = log_ref.where("date", "==", current_date_str).stream()
     count = sum(1 for _ in docs)
     return f"GNA{receipt_date_suffix}{count + 1}"
 
-auto_receipt_no = generate_receipt_number()
+if "receipt_no" not in st.session_state:
+    st.session_state.receipt_no = generate_receipt_number()
 
-# ----------------------------------------------------
-# 🧭 MULTI-PAGE NAVIGATION BAR
-# ----------------------------------------------------
-page = st.sidebar.radio("Navigate System Pages", ["🏥 Dashboard & Form", "💸 Issue Patient Refund", "🔍 Date-Range Auditor", "⚙️ Procedure Price Settings"])
+# -------------------------------
+# NAVIGATION
+# -------------------------------
+page = st.sidebar.radio(
+    "Navigate System Pages",
+    ["🏥 Dashboard & Form", "💸 Issue Patient Refund", "🔍 Date-Range Auditor", "⚙️ Procedure Price Settings"]
+)
 
-# ----------------------------------------------------
-# PAGE 1: MAIN DASHBOARD & ENTRY FORM
-# ----------------------------------------------------
+# =====================================================
+# PAGE 1: DASHBOARD
+# =====================================================
 if page == "🏥 Dashboard & Form":
     st.title("🏥 Gastro Dr. Naveed Anwar Clinic Management System")
     st.markdown("---")
-    
-    col_form, col_display = st.columns()
-    
+
+    col_form, col_display = st.columns(2)
+
+    # ---------------- FORM ----------------
     with col_form:
         st.header("📋 Patient Entry Form")
-        with st.form(key="patient_entry_form", clear_on_submit=True):
-            st.info(f"**Date/Time:** {display_datetime_form} \n\n **Receipt No:** `{auto_receipt_no}`")
-            
-            patient_name = st.text_input("Patient Name *", placeholder="Enter patient's full name")
-            selected_procedure = st.selectbox("Select Procedure", list(PROCEDURE_FEES.keys()))
-            
-            calculated_proc_fee = PROCEDURE_FEES[selected_procedure]
-            actual_total = APPT_FEE + calculated_proc_fee
-            
+
+        with st.form("patient_form", clear_on_submit=True):
+            st.info(f"Date: {display_datetime_form}\n\nReceipt: {st.session_state.receipt_no}")
+
+            patient_name = st.text_input("Patient Name *")
+            selected_procedure = st.selectbox("Procedure", list(PROCEDURE_FEES.keys()))
+
+            proc_fee = PROCEDURE_FEES[selected_procedure]
+            actual_total = APPT_FEE + proc_fee
+
             st.markdown(f"""
-            * **Appointment Fee:** Rs. {APPT_FEE:,.0f}
-            * **Procedure Fee:** Rs. {calculated_proc_fee:,.0f}
-            * **Actual Total Amount:** **Rs. {actual_total:,.0f}**
+            **Appointment:** Rs. {APPT_FEE:,.0f}  
+            **Procedure:** Rs. {proc_fee:,.0f}  
+            **Total:** Rs. {actual_total:,.0f}
             """)
-            
-            paid_amount = st.number_input("Paid Amount (Rs.)", min_value=0.0, step=500.0, value=actual_total)
-            refund_amount = st.number_input("Refund Amount (Rs.)", min_value=0.0, step=500.0, value=0.0)
-            
-            calculated_balance = actual_total - paid_amount + refund_amount
-            st.markdown(f"**Calculated Balance:** Rs. {calculated_balance:,.0f}")
-            
-            submit_button = st.form_submit_button(label="Save Record & Auto-Reset")
-            
-            if submit_button:
+
+            paid_amount = st.number_input("Paid Amount", min_value=0.0, value=actual_total, step=500.0)
+            refund_amount = st.number_input("Refund", min_value=0.0, value=0.0, step=500.0)
+
+            balance = actual_total - paid_amount + refund_amount
+            st.write(f"**Balance:** Rs. {balance:,.0f}")
+
+            submit = st.form_submit_button("Save Record")
+
+            if submit:
                 if not patient_name.strip():
-                    st.error("Submission failed! Patient Name is required.")
+                    st.error("Patient name required")
                 else:
-                    patient_data = {
-                        "receipt_no": auto_receipt_no,
+                    data = {
+                        "receipt_no": st.session_state.receipt_no,
                         "date": current_date_str,
                         "datetime_str": display_datetime_form,
                         "timestamp": firestore.SERVER_TIMESTAMP,
                         "patient_name": patient_name.strip(),
                         "procedure": selected_procedure,
                         "appt_fee": APPT_FEE,
-                        "procedure_fee": calculated_proc_fee,
+                        "procedure_fee": proc_fee,
                         "actual_amount": actual_total,
                         "paid_amount": paid_amount,
                         "refund": refund_amount,
-                        "balance": calculated_balance
+                        "balance": balance
                     }
-                    log_ref.document(auto_receipt_no).set(patient_data)
-                    st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
+
+                    log_ref.document(st.session_state.receipt_no).set(data)
+
+                    st.success("Saved successfully")
+                    st.session_state.receipt_no = generate_receipt_number()
                     st.rerun()
 
+    # ---------------- DISPLAY ----------------
     with col_display:
-        st.header("📊 Live Worksheet (New entries add to the BOTTOM)")
-        
+        st.header("📊 Live Records")
+
         docs = log_ref.order_by("timestamp", direction=firestore.Query.ASCENDING).stream()
-        data_list = [doc.to_dict() for doc in docs]
-        
-        if data_list:
-            df_master = pd.DataFrame(data_list)
-            df_master['date_parsed'] = pd.to_datetime(df_master['date'])
-            today_start = pd.Timestamp(datetime.now().date())
-            df_today = df_master[df_master['date_parsed'] >= today_start]
-            
-            tab_today, tab_receipt = st.tabs(["📅 Today's Live Records", "🧾 Patient Receipt Generator Viewer"])
-            
-            with tab_today:
-                if not df_today.empty:
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Today's Total Billings", f"Rs. {df_today['actual_amount'].sum():,.0f}")
-                    m2.metric("Today's Total Collected", f"Rs. {df_today['paid_amount'].sum():,.0f}")
-                    m3.metric("Today's Pending Balances", f"Rs. {df_today['balance'].sum():,.0f}")
-                    
-                    columns_to_show = ['receipt_no', 'datetime_str', 'patient_name', 'procedure', 'actual_amount', 'paid_amount', 'refund', 'balance']
-                    st.dataframe(df_today[columns_to_show], use_container_width=True, hide_index=True)
-                else:
-                    st.warning("No patients entered today yet.")
-            
-            with tab_receipt:
-                st.subheader("Select a Patient Receipt:")
-                
-                # Create clean string dropdown choices without ArrowString data leaks
-                receipt_list = df_master['receipt_no'].tolist()
-                name_list = df_master['patient_name'].tolist()
-                clean_dropdown_options = [f"{receipt_list[i]} | {name_list[i]}" for i in range(len(receipt_list))]
-                
-                selected_option = st.selectbox("Choose Patient Folder", options=clean_dropdown_options)
-                
-                if selected_option:
-                    selected_receipt_no = selected_option.split(" | ")
-                    matching_rows = df_master[df_master['receipt_no'] == selected_receipt_no]
-                    
-                    if not matching_rows.empty:
-                        p_info = matching_rows.iloc.to_dict()
-                        
-                        # Add raw HTML Printable Component with Javascript Print Command button
-                        receipt_html = f"""
-                        <div id="print-area" style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
-                            <h2 style="text-align:center; color:#008080; margin-bottom:0;">DR. NAVEED ANWAR</h2>
-                            <p style="text-align:center; margin-top:0; font-size:12px;">Gastroenterology & Hepatology Specialist Clinic</p>
-                            <hr style="border-top:1px dashed #008080;">
-                            <p><b>Receipt No:</b> {p_info['receipt_no']} <span style="float:right;"><b>Issued:</b> {p_info.get('datetime_str', p_info['date'])}</span></p>
-                            <p><b>Patient Name:</b> {p_info['patient_name']}</p>
-                            <p><b>Procedure Performed:</b> {p_info['procedure']}</p>
-                            <hr style="border-top:1px dashed #ced4da;">
-                            <p>Appointment Charges: <span style="float:right;">Rs. {float(p_info['appt_fee']):,.0f}</span></p>
-                            <p>Procedure Charges: <span style="float:right;">Rs. {float(p_info['procedure_fee']):,.0f}</span></p>
-                            <h4 style="margin-bottom:5px;">Actual Total Amount: <span style="float:right;">Rs. {float(p_info['actual_amount']):,.0f}</span></h4>
-                            <p style="color:green; margin-top:0; margin-bottom:5px;">Paid Amount: <span style="float:right;">Rs. {float(p_info['paid_amount']):,.0f}</span></p>
-                            <p style="color:red; margin-top:0; margin-bottom:5px;"><b>Refund Disbursed:</b> <span style="float:right;">Rs. {float(p_info['refund']):,.0f}</span></p>
-                            <hr style="border-top: 2px solid #008080;">
-                            <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {float(p_info['balance']):,.0f}</span></h3>
-                        </div>
-                        <br/>
-                        <button onclick="window.print()" style="background-color:#008080; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">🖨️ Click Here to Print Receipt</button>
-                        """
-                        components.html(receipt_html, height=450, scrolling=True)
-        else:
-            st.info("No records logged in the Cloud Database yet.")
+        df = pd.DataFrame([d.to_dict() for d in docs])
 
-# ----------------------------------------------------
-# PAGE 2: REFUND PROCESSING PANEL (NEW)
-# ----------------------------------------------------
+        if not df.empty:
+            df["date_parsed"] = pd.to_datetime(df["date"])
+
+            today = pd.Timestamp(datetime.now().date())
+            df_today = df[df["date_parsed"] >= today]
+
+            tab1, tab2 = st.tabs(["Today", "Receipt Viewer"])
+
+            with tab1:
+                st.metric("Billing", df_today["actual_amount"].sum())
+                st.metric("Collected", df_today["paid_amount"].sum())
+                st.metric("Balance", df_today["balance"].sum())
+
+                st.dataframe(df_today, use_container_width=True)
+
+            with tab2:
+                options = df["receipt_no"] + " | " + df["patient_name"]
+
+                selected = st.selectbox("Select Receipt", options)
+
+                receipt_no = selected.split(" | ")[0]
+
+                match = df[df["receipt_no"] == receipt_no]
+
+                if not match.empty:
+                    row = match.iloc[0].to_dict()   # ✅ FIXED
+
+                    st.json(row)
+
+                    receipt_html = f"""
+                    <div style="padding:20px;border:2px solid teal;">
+                        <h3>{row['receipt_no']}</h3>
+                        <p>{row['patient_name']}</p>
+                    </div>
+                    <button onclick="window.print()">Print</button>
+                    """
+
+                    components.html(receipt_html, height=300)
+# =====================================================
+# PAGE 2: REFUND PANEL
+# =====================================================
 elif page == "💸 Issue Patient Refund":
-    st.title("💸 Doctor Approved Refund Manager Panel")
-    st.markdown("---")
-    
+    st.title("Refund Manager")
+
     docs = log_ref.stream()
-    data_list = [doc.to_dict() for doc in docs]
-    
-    if data_list:
-        df_refund = pd.DataFrame(data_list)
-        
-        receipt_list = df_refund['receipt_no'].tolist()
-        name_list = df_refund['patient_name'].tolist()
-        clean_dropdown_options = [f"{receipt_list[i]} | {name_list[i]}" for i in range(len(receipt_list))]
-        
-        st.subheader("Select Patient to Alter/Issue Refund Details:")
-        target_selection = st.selectbox("Search Receipt/Patient Name", options=clean_dropdown_options)
-        
-        if target_selection:
-            target_receipt = target_selection.split(" | ")
-            p_data = df_refund[df_refund['receipt_no'] == target_receipt].iloc.to_dict()
-            
-            st.write(f"**Current Registered Record Details:**")
-            st.json({
-                "Patient Name": p_data['patient_name'],
-                "Procedure": p_data['procedure'],
-                "Actual Total Cost": f"Rs. {p_data['actual_amount']:,.0f}",
-                "Paid So Far": f"Rs. {p_data['paid_amount']:,.0f}",
-                "Existing Registered Refund": f"Rs. {p_data['refund']:,.0f}"
-            })
-            
-            with st.form("refund_update_form"):
-                new_refund = st.number_input("Enter New Updated Total Refund Amount (Rs.)", min_value=0.0, value=float(p_data['refund']), step=500.0)
-                submit_refund = st.form_submit_button("Save Refund Changes to Cloud")
-                
-                if submit_refund:
-                    # Recompute final accounting balances based on the new variable input values
-                    updated_balance = float(p_data['actual_amount']) - float(p_data['paid_amount']) + new_refund
-                    
-                    log_ref.document(target_receipt).update({
-                        "refund": new_refund,
-                        "balance": updated_balance
-                    })
-                    st.success(f"Balances updated successfully for {p_data['patient_name']}! New Balance: Rs. {updated_balance:,.0f}")
-                    st.rerun()
+    df = pd.DataFrame([d.to_dict() for d in docs])
+
+    if not df.empty:
+        options = df["receipt_no"] + " | " + df["patient_name"]
+        selected = st.selectbox("Select Patient", options)
+
+        receipt_no = selected.split(" | ")[0]
+        row = df[df["receipt_no"] == receipt_no].iloc[0]
+
+        st.write(row.to_dict())
+
+        with st.form("refund"):
+            new_refund = st.number_input("Refund", value=float(row["refund"]), step=500.0)
+
+            if st.form_submit_button("Update"):
+                new_balance = float(row["actual_amount"]) - float(row["paid_amount"]) + new_refund
+
+                log_ref.document(receipt_no).update({
+                    "refund": new_refund,
+                    "balance": new_balance
+                })
+
+                st.success("Updated")
+                st.rerun()
+
     else:
-        st.info("No logs present to process refunds.")
+        st.info("No data")
 
-# ----------------------------------------------------
-# PAGE 3: DATE-RANGE AUDITOR ARCHIVE
-# ----------------------------------------------------
+# =====================================================
+# PAGE 3: AUDIT
+# =====================================================
 elif page == "🔍 Date-Range Auditor":
-    st.title("🔍 Advanced Historical Audit & Custom Date Filters")
-    st.markdown("---")
-    
-    docs = log_ref.stream()
-    data_list = [doc.to_dict() for doc in docs]
-    
-    if data_list:
-        df_audit = pd.DataFrame(data_list)
-        df_audit['date_parsed'] = pd.to_datetime(df_audit['date']).dt.date
-        
-        c1, c2 = st.columns(2)
-        start_date = c1.date_input("From Date", datetime.now().date() - timedelta(days=7))
-        end_date = c2.date_input("To Date", datetime.now().date())
-        
-        if start_date <= end_date:
-            filtered_df = df_audit[(df_audit['date_parsed'] >= start_date) & (df_audit['date_parsed'] <= end_date)]
-            
-            if not filtered_df.empty:
-                st.subheader(f"📊 Aggregated Summaries")
-                
-                a1, a2, a3, a4 = st.columns(4)
-                a1.metric("Total Appointment Fees", f"Rs. {filtered_df['appt_fee'].sum():,.0f}")
-                a2.metric("Total Surgery/Proc Billings", f"Rs. {filtered_df['procedure_fee'].sum():,.0f}")
-                a3.metric("Grand Cash Collected", f"Rs. {filtered_df['paid_amount'].sum():,.0f}")
-                a4.metric("Total Patients Processed", f"{len(filtered_df)} Patients")
-                
-                st.markdown("---")
-                st.subheader("📋 Count & Revenue Breakdown per Surgery/Procedure Type")
-                proc_breakdown = filtered_df.groupby('procedure').agg(
-                    Total_Count=('patient_name', 'count'),
-                    Total_Revenue=('procedure_fee', 'sum')
-                ).reset_index()
-                st.dataframe(proc_breakdown, use_container_width=True, hide_index=True)
-                
-                st.markdown("---")
-                st.subheader("🗄️ Detailed Matching Patient Sub-List")
-                st.dataframe(filtered_df.drop(columns=['timestamp', 'date_parsed']), use_container_width=True, hide_index=True)
-            else:
-                st.warning("No clinic documents match the selected date constraints.")
+    st.title("Audit Logs")
 
-# ----------------------------------------------------
-# PAGE 4: PRICING SETTINGS MANAGER
-# ----------------------------------------------------
+    docs = log_ref.stream()
+    df = pd.DataFrame([d.to_dict() for d in docs])
+
+    if not df.empty:
+        df["date_parsed"] = pd.to_datetime(df["date"]).dt.date
+
+        start = st.date_input("Start", datetime.now().date() - timedelta(days=7))
+        end = st.date_input("End", datetime.now().date())
+
+        filtered = df[(df["date_parsed"] >= start) & (df["date_parsed"] <= end)]
+
+        if not filtered.empty:
+            st.metric("Patients", len(filtered))
+            st.metric("Revenue", filtered["paid_amount"].sum())
+
+            st.dataframe(filtered)
+
+        else:
+            st.warning("No records")
+
+# =====================================================
+# PAGE 4: SETTINGS
+# =====================================================
 elif page == "⚙️ Procedure Price Settings":
-    st.title("⚙️ Clinic Control Panel & Pricing Administration")
-    st.markdown("---")
-    
-    with st.form("settings_form"):
-        new_appt = st.number_input("Universal Consultation/Appointment Fee (Rs.)", min_value=0.0, value=float(APPT_FEE), step=500.0)
-        updated_fees = {"appt_fee": new_appt}
-        for proc, current_fee in PROCEDURE_FEES.items():
-            if proc != "None (Consultation Only)":
-                updated_fees[proc] = st.number_input(f"{proc} Fee Cost (Rs.)", min_value=0.0, value=float(current_fee), step=500.0)
-            else:
-                updated_fees[proc] = 0.0
-                
-        save_settings = st.form_submit_button("Update Rates Globally")
-        if save_settings:
-            settings_ref.document("pricing").set(updated_fees)
-            st.success("Clinic pricing configurations synchronized successfully!")
+    st.title("Pricing Settings")
+
+    with st.form("settings"):
+        new_appt = st.number_input("Appointment Fee", value=float(APPT_FEE), step=500.0)
+
+        updated = {"appt_fee": new_appt}
+
+        for k, v in PROCEDURE_FEES.items():
+            updated[k] = st.number_input(k, value=float(v), step=500.0)
+
+        if st.form_submit_button("Save"):
+            settings_ref.document("pricing").set(updated)
+            st.success("Updated")
             st.rerun()
