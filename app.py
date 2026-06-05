@@ -177,28 +177,31 @@ if page == "🏥 Dashboard & Form":
                 )
                 
                 if patient_select:
-                    # FIX: Using .iloc safely by ensuring we isolate the matching row explicitly
+                    # Isolate the exact matching row as a dictionary to avoid Pandas indexing bugs
                     matching_rows = df_master[df_master['receipt_no'] == patient_select]
-                    p_info = matching_rows.iloc
                     
-                    st.markdown(f"""
-                    <div style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
-                        <h2 style="text-align:center; color:#008080; margin-bottom:0;">DR. NAVEED ANWAR</h2>
-                        <p style="text-align:center; margin-top:0; font-size:12px;">Gastroenterology & Hepatology Specialist Clinic</p>
-                        <hr style="border-top:1px dashed #008080;">
-                        <p><b>Receipt No:</b> {p_info['receipt_no']} <span style="float:right;"><b>Date:</b> {p_info['date']}</span></p>
-                        <p><b>Patient Name:</b> {p_info['patient_name']}</p>
-                        <p><b>Procedure Performed:</b> {p_info['procedure']}</p>
-                        <hr style="border-top:1px dashed #ced4da;">
-                        <p>Appointment Charges: <span style="float:right;">Rs. {float(p_info['appt_fee']):,.0f}</span></p>
-                        <p>Procedure Charges: <span style="float:right;">Rs. {float(p_info['procedure_fee']):,.0f}</span></p>
-                        <h4 style="margin-bottom:5px;">Actual Total Amount: <span style="float:right;">Rs. {float(p_info['actual_amount']):,.0f}</span></h4>
-                        <p style="color:green; margin-top:0; margin-bottom:5px;">Paid Amount: <span style="float:right;">Rs. {float(p_info['paid_amount']):,.0f}</span></p>
-                        <p style="color:red; margin-top:0; margin-bottom:5px;"><b>Refund Disbursed (By Dr. Order):</b> <span style="float:right;">Rs. {float(p_info['refund']):,.0f}</span></p>
-                        <hr style="border-top: 2px solid #008080;">
-                        <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {float(p_info['balance']):,.0f}</span></h3>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    if not matching_rows.empty:
+                        # Convert the single row directly into a clean Python dictionary
+                        p_info = matching_rows.iloc.to_dict()
+                        
+                        st.markdown(f"""
+                        <div style="padding:20px; border:2px solid #008080; border-radius:10px; background-color:#f9f9f9; font-family:monospace;">
+                            <h2 style="text-align:center; color:#008080; margin-bottom:0;">DR. NAVEED ANWAR</h2>
+                            <p style="text-align:center; margin-top:0; font-size:12px;">Gastroenterology & Hepatology Specialist Clinic</p>
+                            <hr style="border-top:1px dashed #008080;">
+                            <p><b>Receipt No:</b> {p_info['receipt_no']} <span style="float:right;"><b>Date:</b> {p_info['date']}</span></p>
+                            <p><b>Patient Name:</b> {p_info['patient_name']}</p>
+                            <p><b>Procedure Performed:</b> {p_info['procedure']}</p>
+                            <hr style="border-top:1px dashed #ced4da;">
+                            <p>Appointment Charges: <span style="float:right;">Rs. {float(p_info['appt_fee']):,.0f}</span></p>
+                            <p>Procedure Charges: <span style="float:right;">Rs. {float(p_info['procedure_fee']):,.0f}</span></p>
+                            <h4 style="margin-bottom:5px;">Actual Total Amount: <span style="float:right;">Rs. {float(p_info['actual_amount']):,.0f}</span></h4>
+                            <p style="color:green; margin-top:0; margin-bottom:5px;">Paid Amount: <span style="float:right;">Rs. {float(p_info['paid_amount']):,.0f}</span></p>
+                            <p style="color:red; margin-top:0; margin-bottom:5px;"><b>Refund Disbursed:</b> <span style="float:right;">Rs. {float(p_info['refund']):,.0f}</span></p>
+                            <hr style="border-top: 2px solid #008080;">
+                            <h3 style="color:#008080; margin-top:0;">Net Outstanding Balance: <span style="float:right;">Rs. {float(p_info['balance']):,.0f}</span></h3>
+                        </div>
+                        """, unsafe_allow_html=True)
 
            
 # ----------------------------------------------------
