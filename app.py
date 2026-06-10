@@ -15,17 +15,22 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🇵🇰 PAKISTAN STANDARD TIME (PKT) – Always use this for receipts
+# TIME SYSTEM (CLOUD SAFE)
 # ----------------------------------------------------
+
+# 1. Always generate UTC time (server standard)
+utc_now = datetime.now(timezone.utc)
+
+# 2. Convert UTC → Pakistan Time for display
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
-current_time_pkt = datetime.now(pkt_zone)
+pkt_time = utc_now.astimezone(pkt_zone)
 
-# Format for display in receipt and forms
-display_datetime_form = current_time_pkt.strftime("%d-%m-%Y %I:%M %p")
-receipt_date_suffix = current_time_pkt.strftime("%d%m%Y")
+# 3. Receipt display time (PKT)
+display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
 
-# Display PKT time (for verification if needed)
-st.write(f"🕒 PKT Time: {display_datetime_form}")
+# 4. Receipt ID date suffix (PKT-based)
+receipt_date_suffix = pkt_time.strftime("%d%m%Y")
+
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
 # ----------------------------------------------------
