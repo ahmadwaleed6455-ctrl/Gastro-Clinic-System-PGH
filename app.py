@@ -1,23 +1,28 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import zoneinfo  # Built-in timezone management module
+import zoneinfo
 from google.oauth2 import service_account
 from google.cloud import firestore
 import streamlit.components.v1 as components
 
-# Set page config
-st.set_page_config(page_title="Gastro Dr. Naveed Anwar - Clinic Portal", layout="wide")
+# ----------------------------------------------------
+# PAGE CONFIG
+# ----------------------------------------------------
+st.set_page_config(
+    page_title="Gastro Dr. Naveed Anwar - Clinic Portal",
+    layout="wide"
+)
 
 # ----------------------------------------------------
-# 🇵🇰 PAKISTAN STANDARD TIME (PKT) ENVIRONMENT ENGINE
+# 🇵🇰 PAKISTAN STANDARD TIME (PKT)
 # ----------------------------------------------------
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
-current_time_pkt = datetime.now(pkt_zone) 
+current_time_pkt = datetime.now(pkt_zone)
 
 current_date_str = current_time_pkt.strftime("%Y-%m-%d")
 display_datetime_form = current_time_pkt.strftime("%d-%m-%Y %I:%M %p")
-receipt_date_suffix = current_time_pkt.strftime("%d%m%Y"))
+receipt_date_suffix = current_time_pkt.strftime("%d%m%Y")
 
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
