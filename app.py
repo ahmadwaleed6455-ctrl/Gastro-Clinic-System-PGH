@@ -1,10 +1,6 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import zoneinfo
-from google.oauth2 import service_account
-from google.cloud import firestore
-import streamlit.components.v1 as components
 
 # ----------------------------------------------------
 # PAGE CONFIG
@@ -15,27 +11,17 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# 🇵🇰 PAKISTAN STANDARD TIME (PKT)
+# 🇵🇰 PAKISTAN STANDARD TIME (PKT) – Always use this for receipts
 # ----------------------------------------------------
-# Get current UTC time
-utc_now = datetime.now(zoneinfo.ZoneInfo("UTC"))
+pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
+current_time_pkt = datetime.now(pkt_zone)
 
-# Convert UTC to PKT
-pkt_time = utc_now.astimezone(zoneinfo.ZoneInfo("Asia/Karachi"))
+# Format for display in receipt and forms
+display_datetime_form = current_time_pkt.strftime("%d-%m-%Y %I:%M %p")
+receipt_date_suffix = current_time_pkt.strftime("%d%m%Y")
 
-# Format for display
-display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
-
-# Local system time
-current_time_local = datetime.now()
-
-# Display both times
+# Display PKT time (for verification if needed)
 st.write(f"🕒 PKT Time: {display_datetime_form}")
-st.write(f"🕒 Local System Time: {current_time_local.strftime('%d-%m-%Y %I:%M %p')}")
-
-# PKT date suffix for receipts
-receipt_date_suffix = pkt_time.strftime("%d%m%Y")
-
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
 # ----------------------------------------------------
