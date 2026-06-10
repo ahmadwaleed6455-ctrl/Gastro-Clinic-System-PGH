@@ -15,19 +15,12 @@ st.set_page_config(
 )
 
 
-# ----------------------------------------------------
-# TIME SYSTEM (CLOUD SAFE + FIXED)
-# ----------------------------------------------------
-
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
 
-# ALWAYS start from UTC (cloud-safe standard)
 utc_now = datetime.now(timezone.utc)
 
-# Convert to PKT
 pkt_time = utc_now.astimezone(pkt_zone)
 
-# FINAL OUTPUT (USE THIS EVERYWHERE)
 display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
 receipt_date_suffix = pkt_time.strftime("%d%m%Y")
 
