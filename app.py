@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import zoneinfo
 from datetime import datetime, timedelta, timezone
-
 from google.oauth2 import service_account
 from google.cloud import firestore
 import streamlit.components.v1 as components
@@ -18,7 +17,6 @@ st.set_page_config(
 # ----------------------------------------------------
 # 🇵🇰 TIME SYSTEM (CLOUD SAFE + PKT FIXED)
 # ----------------------------------------------------
-
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
 
 # Always start from UTC (safe for cloud servers)
@@ -30,11 +28,11 @@ pkt_time = utc_now.astimezone(pkt_zone)
 # FINAL DISPLAY FORMAT (USE THIS IN RECEIPTS)
 display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
 
+# Clean system date string used to group entries in Firestore
+current_date_str = pkt_time.strftime("%Y-%m-%d")
+
 # Receipt date suffix
 receipt_date_suffix = pkt_time.strftime("%d%m%Y")
-
-# Optional debug (you can remove later)
-st.write("🕒 PKT Time:", display_datetime_form)
 
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
