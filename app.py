@@ -17,19 +17,24 @@ st.set_page_config(
 # ----------------------------------------------------
 # 🇵🇰 PAKISTAN STANDARD TIME (PKT)
 # ----------------------------------------------------
+# Get current UTC time
 utc_now = datetime.now(zoneinfo.ZoneInfo("UTC"))
 
-pkt_time = utc_now.astimezone(
-    zoneinfo.ZoneInfo("Asia/Karachi")
-)
+# Convert UTC to PKT
+pkt_time = utc_now.astimezone(zoneinfo.ZoneInfo("Asia/Karachi"))
 
+# Format for display
 display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
 
+# Local system time
 current_time_local = datetime.now()
 
-st.write(f"🕒 PKT Time: {current_time_pkt.strftime('%d-%m-%Y %I:%M %p')}")
+# Display both times
+st.write(f"🕒 PKT Time: {display_datetime_form}")
 st.write(f"🕒 Local System Time: {current_time_local.strftime('%d-%m-%Y %I:%M %p')}")
-receipt_date_suffix = current_time_pkt.strftime("%d%m%Y")
+
+# PKT date suffix for receipts
+receipt_date_suffix = pkt_time.strftime("%d%m%Y")
 
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
