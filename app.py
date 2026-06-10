@@ -71,9 +71,8 @@ PROCEDURE_FEES = {k: v for k, v in FEES.items() if k != "appt_fee"}
 # ----------------------------------------------------
 # 🕒 TIME & AUTO-RECEIPT GENERATOR
 # ----------------------------------------------------
-current_date_str = datetime.now().strftime("%Y-%m-%d")
-display_datetime_form = datetime.now().strftime("%d-%m-%Y %I:%M %p")
-receipt_date_suffix = datetime.now().strftime("%d%m%Y")
+# Reuse the safe PKT date string to search today's database logs
+current_date_str = pkt_time.strftime("%Y-%m-%d")
 
 def generate_receipt_number():
     docs = log_ref.where("date", "==", current_date_str).stream()
