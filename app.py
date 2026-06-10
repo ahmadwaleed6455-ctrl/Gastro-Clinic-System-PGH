@@ -19,10 +19,11 @@ st.set_page_config(
 # ----------------------------------------------------
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
 current_time_pkt = datetime.now(pkt_zone)
-print("PKT Time:", current_time_pkt.strftime("%d-%m-%Y %I:%M %p"))
 
-current_date_str = current_time_pkt.strftime("%Y-%m-%d")
-display_datetime_form = current_time_pkt.strftime("%d-%m-%Y %I:%M %p")
+current_time_local = datetime.now()
+
+st.write(f"🕒 PKT Time: {current_time_pkt.strftime('%d-%m-%Y %I:%M %p')}")
+st.write(f"🕒 Local System Time: {current_time_local.strftime('%d-%m-%Y %I:%M %p')}")
 receipt_date_suffix = current_time_pkt.strftime("%d%m%Y")
 
 # ----------------------------------------------------
