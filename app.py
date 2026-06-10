@@ -197,10 +197,12 @@ if page == "🏥 Dashboard & Form":
                     total_cash_collected = df_today['paid_amount'].sum()
                     total_pending_balances = df_today['balance'].sum()
             
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("Today's Total Billings (Minus Relief)", f"Rs. {net_clinic_billings:,.0f}")
+                    # Clean 4-column financial summary row
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Today's Total Billings", f"Rs. {net_clinic_billings:,.0f}")
                     m2.metric("Today's Total Collected", f"Rs. {total_cash_collected:,.0f}")
-                    m3.metric("Today's Pending Balances", f"Rs. {total_pending_balances:,.0f}")
+                    m3.metric("Today's Total Relief/Refunds", f"Rs. {todays_refunds_relief:,.0f}")
+                    m4.metric("Today's Pending Balances", f"Rs. {total_pending_balances:,.0f}")
             
                     columns_to_show = [
                         'receipt_no', 'datetime_str', 'patient_name', 'procedure',
