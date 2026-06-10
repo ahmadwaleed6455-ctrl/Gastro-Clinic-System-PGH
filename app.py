@@ -103,7 +103,7 @@ st.sidebar.markdown("---")
 page = st.sidebar.radio("Navigate System Pages", ["🏥 Dashboard & Form", "💸 Issue Patient Refund", "🔍 Date-Range Auditor", "⚙️ Procedure Price Settings"])
 
 # ----------------------------------------------------
-# PAGE 1: MAIN DASHBOARD & ENTRY FORM
+# PAGE 1: MAIN DASHBOARD & ENTRY FORM 
 # ----------------------------------------------------
 if page == "🏥 Dashboard & Form":
     st.title("🏥 Gastro Dr. Naveed Anwar Clinic Management System")
@@ -113,39 +113,45 @@ if page == "🏥 Dashboard & Form":
     
     with col_form:
         st.header("📋 Patient Entry Form")
-        
-        # We handle layout elements inside a dynamic container block to reflect value alterations instantly
         st.info(f"**Date/Time:** {display_datetime_form} \n\n **Receipt No:** `{auto_receipt_no}`")
         
         patient_name = st.text_input("Patient Name *", placeholder="Enter patient's full name")
-        selected_procedure = st.selectbox("Select Procedure", list(PROCEDURE_FEES.keys()))
         
-        calculated_proc_fee = PROCEDURE_FEES[selected_procedure]
-        actual_total = APPT_FEE + calculated_proc_fee
+        # 1️⃣ Selection 1: Consultation Options
+        consultation_mode = st.radio(
+            "Include Consultation/OPD Charges?",
+            ["Yes (Include Fee)", "No (Procedure Only)"],
+            horizontal=True
+        )
+        current_appt_fee = APPT_FEE if consultation_mode == "Yes (Include Fee)" else 0.0
+        
+        # 2️⃣ Selection 2: Procedure Options
+        selected_procedure = st.selectbox("Select Procedure Type", list(PROCEDURE_FEES.keys()))
+        current_proc_fee = PROCEDURE_FEES[selected_procedure]
+        
+        # 3️⃣ Automatic Math Integration Engine
+        actual_total = current_appt_fee + current_proc_fee
         
         st.markdown(f"""
-        * **Appointment Fee:** Rs. {APPT_FEE:,.0f}
-        * **Procedure Fee:** Rs. {calculated_proc_fee:,.0f}
-        * **Actual Total Amount:** **Rs. {actual_total:,.0f}**
-        """)
+        <div style="background-color:#f0f2f6; padding:15px; border-radius:8px; margin-bottom:10px;">
+            <p style="margin:0;">📋 <b>Fee Breakdown:</b></p>
+            <hr style="margin:8px 0;">
+            <p style="margin:4px 0;">Consultation/OPD: <span style="float:right;">Rs. {current_appt_fee:,.0f}</span></p>
+            <p style="margin:4px 0;">Selected Procedure: <span style="float:right;">Rs. {current_proc_fee:,.0f}</span></p>
+            <h4 style="margin:8px 0 0 0; color:#008080;">Actual Total Bill: <span style="float:right;">Rs. {actual_total:,.0f}</span></h4>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # FIX: The form submit utilizes interactive widgets directly linked to the actual_total auto-calculated value
+        # Interactive form container
         with st.form(key="patient_entry_form", clear_on_submit=True):
             paid_amount = st.number_input("Paid Amount (Rs.)", min_value=0.0, step=500.0, value=actual_total)
-            
-            # Form actions pass processing instructions downstream
             submit_button = st.form_submit_button(label="Save Record & Auto-Reset")
-            
             
             if submit_button:
                 if not patient_name.strip():
                     st.error("Submission failed! Patient Name is required.")    
                 else:
-                # Calculate actual total amount: appointment + procedure - refund (currently 0 on new entry)
-                    net_total_bill = APPT_FEE + calculated_proc_fee  # Refund is 0 at entry
-            
-                    # Remaining balance after paid amount
-                    calculated_balance = net_total_bill - paid_amount
+                    calculated_balance = actual_total - paid_amount
             
                     patient_data = {
                         "receipt_no": auto_receipt_no,
@@ -154,17 +160,17 @@ if page == "🏥 Dashboard & Form":
                         "timestamp": firestore.SERVER_TIMESTAMP,
                         "patient_name": patient_name.strip(),
                         "procedure": selected_procedure,
-                        "appt_fee": APPT_FEE,
-                        "procedure_fee": calculated_proc_fee,
-                        "actual_amount": net_total_bill,  # Net bill without refund
+                        "appt_fee": current_appt_fee,       # Saves actual billed fee (either 2500 or 0)
+                        "procedure_fee": current_proc_fee,   # Saves actual procedure cost
+                        "actual_amount": actual_total,       # True combined billing total
                         "paid_amount": paid_amount,
-                        "refund": 0.0,  # Starts at 0 until updated on refund page
+                        "refund": 0.0,  
                         "balance": calculated_balance
                     }
 
-                log_ref.document(auto_receipt_no).set(patient_data)
-                st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
-                st.rerun()
+                    log_ref.document(auto_receipt_no).set(patient_data)
+                    st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
+                    st.rerun()
                     
     with col_display:
         st.header("📊 Live Worksheet (New entries add to the BOTTOM)")
