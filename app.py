@@ -19,6 +19,7 @@ st.set_page_config(
 # ----------------------------------------------------
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
 current_time_pkt = datetime.now(pkt_zone)
+print("PKT Time:", current_time_pkt.strftime("%d-%m-%Y %I:%M %p"))
 
 current_date_str = current_time_pkt.strftime("%Y-%m-%d")
 display_datetime_form = current_time_pkt.strftime("%d-%m-%Y %I:%M %p")
