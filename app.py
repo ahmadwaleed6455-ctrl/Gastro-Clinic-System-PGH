@@ -255,102 +255,135 @@ if page == "🏥 Dashboard & Form":
 elif page == "💸 Issue Patient Refund":
     st.title("💸 Patient Payment & Refund Adjustment Panel")
     st.markdown("---")
-    
+
     docs = log_ref.stream()
     data_list = [doc.to_dict() for doc in docs]
-    
+
     if data_list:
         df_refund = pd.DataFrame(data_list)
-        
-        receipt_list = df_refund['receipt_no'].tolist()
-        name_list = df_refund['patient_name'].tolist()
-        clean_dropdown_options = [f"{receipt_list[i]} | {name_list[i]}" for i in range(len(receipt_list))]
-        
+
+        receipt_list = df_refund["receipt_no"].tolist()
+        name_list = df_refund["patient_name"].tolist()
+
+        clean_dropdown_options = [
+            f"{receipt_list[i]} | {name_list[i]}"
+            for i in range(len(receipt_list))
+        ]
+
         st.subheader("Select Patient to Adjust Payment or Refund Details:")
-        target_selection = st.selectbox("Search Receipt/Patient Name", options=clean_dropdown_options)
-        
-       if target_selection:
-    
-    # SAFELY extract receipt number
-    target_receipt = target_selection.split(" | ")[0] if " | " in target_selection else target_selection
-    
-    # Fetch matching record from today's dataframe
-    matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
-    
-    if not matching_rows.empty:
-        
-        # Convert first matching row to dict safely
-        p_data = matching_rows.iloc[0].to_dict()
-        
-        # Safe conversion to float
-        def safe_float(value):
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return 0.0
-        
-        current_bal = safe_float(p_data.get('balance', 0))
-        
-        # Display balance info
-        if current_bal > 0:
-            st.warning(f"⚠️ This patient has an outstanding balance of **Rs. {current_bal:,.0f}**")
-        else:
-            st.success("✅ This patient's account is fully cleared.")
-        
-        # Show current patient record
-        st.write("**Current Registered Record Details:**")
-        st.json({
-            "Patient Name": p_data.get('patient_name', ''),
-            "Procedure": p_data.get('procedure', ''),
-            "Actual Total Cost": f"Rs. {safe_float(p_data.get('actual_amount')):,.0f}",
-            "Paid So Far": f"Rs. {safe_float(p_data.get('paid_amount')):,.0f}",
-            "Existing Registered Refund": f"Rs. {safe_float(p_data.get('refund')):,.0f}"
-        })
-        
-        # Adjustment form
-        with st.form("refund_update_form"):
-            
-            updated_paid = st.number_input(
-                "Update Total Paid Amount (Rs.)",
-                min_value=0.0,
-                value=safe_float(p_data.get('paid_amount')),
-                step=500.0,
-                help="Increase this amount when patient pays remaining balance."
+
+        target_selection = st.selectbox(
+            "Search Receipt/Patient Name",
+            options=clean_dropdown_options
+        )
+
+        if target_selection:
+
+            # SAFELY extract receipt number
+            target_receipt = (
+                target_selection.split(" | ")[0]
+                if " | " in target_selection
+                else target_selection
             )
-            
-            new_refund = st.number_input(
-                "Update Total Refund Amount (Rs.)",
-                min_value=0.0,
-                value=safe_float(p_data.get('refund')),
-                step=500.0
-            )
-            
-            submit_adjustments = st.form_submit_button("Save Changes to Cloud")
-            
-            if submit_adjustments:
-                base_amount = safe_float(p_data.get('actual_amount'))
-                
-                # Calculate new balance after refund and payment
-                updated_balance = max(0.0, (base_amount - new_refund) - updated_paid)
-                
-                # Update Firestore
-                log_ref.document(target_receipt).update({
-                    "paid_amount": updated_paid,
-                    "refund": new_refund,
-                    "balance": updated_balance
+
+            # Fetch matching record
+            matching_rows = df_refund[
+                df_refund["receipt_no"] == target_receipt
+            ]
+
+            if not matching_rows.empty:
+
+                # Convert first matching row to dictionary
+                p_data = matching_rows.iloc[0].to_dict()
+
+                # Safe float conversion
+                def safe_float(value):
+                    try:
+                        return float(value)
+                    except (TypeError, ValueError):
+                        return 0.0
+
+                current_bal = safe_float(p_data.get("balance", 0))
+
+                # Balance status
+                if current_bal > 0:
+                    st.warning(
+                        f"⚠️ This patient has an outstanding balance of "
+                        f"Rs. {current_bal:,.0f}"
+                    )
+                else:
+                    st.success("✅ This patient's account is fully cleared.")
+
+                # Current record details
+                st.write("**Current Registered Record Details:**")
+
+                st.json({
+                    "Patient Name": p_data.get("patient_name", ""),
+                    "Procedure": p_data.get("procedure", ""),
+                    "Actual Total Cost": f"Rs. {safe_float(p_data.get('actual_amount')):,.0f}",
+                    "Paid So Far": f"Rs. {safe_float(p_data.get('paid_amount')):,.0f}",
+                    "Existing Registered Refund": f"Rs. {safe_float(p_data.get('refund')):,.0f}"
                 })
-                
-                st.success(f"Updated successfully! New Balance: Rs. {updated_balance:,.0f}")
-                
-                # Refresh page to reflect changes
-                st.rerun()
-                
+
+                # Adjustment form
+                with st.form("refund_update_form"):
+
+                    updated_paid = st.number_input(
+                        "Update Total Paid Amount (Rs.)",
+                        min_value=0.0,
+                        value=safe_float(p_data.get("paid_amount")),
+                        step=500.0,
+                        help="Increase this amount when patient pays remaining balance."
+                    )
+
+                    new_refund = st.number_input(
+                        "Update Total Refund Amount (Rs.)",
+                        min_value=0.0,
+                        value=safe_float(p_data.get("refund")),
+                        step=500.0
+                    )
+
+                    submit_adjustments = st.form_submit_button(
+                        "Save Changes to Cloud"
+                    )
+
+                    if submit_adjustments:
+
+                        base_amount = safe_float(
+                            p_data.get("actual_amount")
+                        )
+
+                        # Accounting Rule:
+                        # Balance = (Actual Amount - Refund) - Paid Amount
+                        updated_balance = (
+                            (base_amount - new_refund)
+                            - updated_paid
+                        )
+
+                        # Prevent negative balances
+                        updated_balance = max(0.0, updated_balance)
+
+                        # Update Firestore
+                        log_ref.document(target_receipt).update({
+                            "paid_amount": updated_paid,
+                            "refund": new_refund,
+                            "balance": updated_balance
+                        })
+
+                        st.success(
+                            f"Updated successfully! "
+                            f"New Balance: Rs. {updated_balance:,.0f}"
+                        )
+
+                        st.rerun()
+
+            else:
+                st.warning(
+                    "No matching patient record found for selected receipt."
+                )
+
     else:
-        st.warning("No matching patient record found for selected receipt.")
-        
-else:
-    st.info("No logs present to process adjustments.")
-# ----------------------------------------------------
+        st.info("No logs present to process adjustments.")# ----------------------------------------------------
 # PAGE 3: DATE-RANGE AUDITOR ARCHIVE (FIXED)
 # ----------------------------------------------------
 elif page == "🔍 Date-Range Auditor":
