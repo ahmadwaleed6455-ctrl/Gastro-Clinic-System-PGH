@@ -115,13 +115,17 @@ if page == "🏥 Dashboard & Form":
             # Form actions pass processing instructions downstream
             submit_button = st.form_submit_button(label="Save Record & Auto-Reset")
             
+            
             if submit_button:
                 if not patient_name.strip():
-                    st.error("Submission failed! Patient Name is required.")
+                    st.error("Submission failed! Patient Name is required.")    
                 else:
-                    # Balance calculation without legacy front-page inputs
-                    calculated_balance = actual_total - paid_amount
-                    
+                # Calculate actual total amount: appointment + procedure - refund (currently 0 on new entry)
+                    net_total_bill = APPT_FEE + calculated_proc_fee  # Refund is 0 at entry
+            
+                    # Remaining balance after paid amount
+                    calculated_balance = net_total_bill - paid_amount
+            
                     patient_data = {
                         "receipt_no": auto_receipt_no,
                         "date": current_date_str,
@@ -131,15 +135,16 @@ if page == "🏥 Dashboard & Form":
                         "procedure": selected_procedure,
                         "appt_fee": APPT_FEE,
                         "procedure_fee": calculated_proc_fee,
-                        "actual_amount": actual_total,
+                        "actual_amount": net_total_bill,  # Net bill without refund
                         "paid_amount": paid_amount,
-                        "refund": 0.0, # Removed layout field, defaults to zero on new patient
+                        "refund": 0.0,  # Starts at 0 until updated on refund page
                         "balance": calculated_balance
                     }
-                    log_ref.document(auto_receipt_no).set(patient_data)
-                    st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
-                    st.rerun()
 
+                log_ref.document(auto_receipt_no).set(patient_data)
+                st.success(f"Saved successfully! Receipt: {auto_receipt_no}")
+                st.rerun()
+                    
     with col_display:
         st.header("📊 Live Worksheet (New entries add to the BOTTOM)")
         
@@ -162,12 +167,24 @@ if page == "🏥 Dashboard & Form":
             
             with tab_today:
                 if not df_today.empty:
+                    # Calculate totals based on new accounting rules
+                    todays_billings = df_today['actual_amount'].sum()
+                    todays_refunds_relief = df_today['refund'].sum()
+            
+                    # Net billings after doctor relief/refunds
+                    net_clinic_billings = todays_billings - todays_refunds_relief
+                    total_cash_collected = df_today['paid_amount'].sum()
+                    total_pending_balances = df_today['balance'].sum()
+            
                     m1, m2, m3 = st.columns(3)
-                    m1.metric("Today's Total Billings", f"Rs. {df_today['actual_amount'].sum():,.0f}")
-                    m2.metric("Today's Total Collected", f"Rs. {df_today['paid_amount'].sum():,.0f}")
-                    m3.metric("Today's Pending Balances", f"Rs. {df_today['balance'].sum():,.0f}")
-                    
-                    columns_to_show = ['receipt_no', 'datetime_str', 'patient_name', 'procedure', 'actual_amount', 'paid_amount', 'refund', 'balance']
+                    m1.metric("Today's Total Billings (Minus Relief)", f"Rs. {net_clinic_billings:,.0f}")
+                    m2.metric("Today's Total Collected", f"Rs. {total_cash_collected:,.0f}")
+                    m3.metric("Today's Pending Balances", f"Rs. {total_pending_balances:,.0f}")
+            
+                    columns_to_show = [
+                        'receipt_no', 'datetime_str', 'patient_name', 'procedure',
+                        'actual_amount', 'paid_amount', 'refund', 'balance'
+                    ]
                     st.dataframe(df_today[columns_to_show], use_container_width=True, hide_index=True)
                 else:
                     st.warning("No patients entered today yet.")
@@ -252,78 +269,87 @@ elif page == "💸 Issue Patient Refund":
         st.subheader("Select Patient to Adjust Payment or Refund Details:")
         target_selection = st.selectbox("Search Receipt/Patient Name", options=clean_dropdown_options)
         
-        if target_selection:
+       if target_selection:
+    
+    # SAFELY extract receipt number
+    target_receipt = target_selection.split(" | ")[0] if " | " in target_selection else target_selection
+    
+    # Fetch matching record from today's dataframe
+    matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
+    
+    if not matching_rows.empty:
+        
+        # Convert first matching row to dict safely
+        p_data = matching_rows.iloc[0].to_dict()
+        
+        # Safe conversion to float
+        def safe_float(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+        
+        current_bal = safe_float(p_data.get('balance', 0))
+        
+        # Display balance info
+        if current_bal > 0:
+            st.warning(f"⚠️ This patient has an outstanding balance of **Rs. {current_bal:,.0f}**")
+        else:
+            st.success("✅ This patient's account is fully cleared.")
+        
+        # Show current patient record
+        st.write("**Current Registered Record Details:**")
+        st.json({
+            "Patient Name": p_data.get('patient_name', ''),
+            "Procedure": p_data.get('procedure', ''),
+            "Actual Total Cost": f"Rs. {safe_float(p_data.get('actual_amount')):,.0f}",
+            "Paid So Far": f"Rs. {safe_float(p_data.get('paid_amount')):,.0f}",
+            "Existing Registered Refund": f"Rs. {safe_float(p_data.get('refund')):,.0f}"
+        })
+        
+        # Adjustment form
+        with st.form("refund_update_form"):
             
-            # FIX 1: correct string extraction (NOT list)
-            target_receipt = target_selection.split(" | ")[0]
+            updated_paid = st.number_input(
+                "Update Total Paid Amount (Rs.)",
+                min_value=0.0,
+                value=safe_float(p_data.get('paid_amount')),
+                step=500.0,
+                help="Increase this amount when patient pays remaining balance."
+            )
             
-            matching_rows = df_refund[df_refund['receipt_no'] == target_receipt]
+            new_refund = st.number_input(
+                "Update Total Refund Amount (Rs.)",
+                min_value=0.0,
+                value=safe_float(p_data.get('refund')),
+                step=500.0
+            )
             
-            if not matching_rows.empty:
+            submit_adjustments = st.form_submit_button("Save Changes to Cloud")
+            
+            if submit_adjustments:
+                base_amount = safe_float(p_data.get('actual_amount'))
                 
-                # FIX 2: correct iloc usage
-                p_data = matching_rows.iloc[0].to_dict()
+                # Calculate new balance after refund and payment
+                updated_balance = max(0.0, (base_amount - new_refund) - updated_paid)
                 
-                # Safe balance handling
-                current_bal = float(p_data.get('balance', 0))
-                
-                if current_bal > 0:
-                    st.warning(f"⚠️ This patient has an outstanding balance of **Rs. {current_bal:,.0f}**")
-                else:
-                    st.success("✅ This patient's account is fully cleared.")
-                
-                st.write("**Current Registered Record Details:**")
-                st.json({
-                    "Patient Name": p_data.get('patient_name', ''),
-                    "Procedure": p_data.get('procedure', ''),
-                    "Actual Total Cost": f"Rs. {float(p_data.get('actual_amount', 0)):,.0f}",
-                    "Paid So Far": f"Rs. {float(p_data.get('paid_amount', 0)):,.0f}",
-                    "Existing Registered Refund": f"Rs. {float(p_data.get('refund', 0)):,.0f}"
+                # Update Firestore
+                log_ref.document(target_receipt).update({
+                    "paid_amount": updated_paid,
+                    "refund": new_refund,
+                    "balance": updated_balance
                 })
                 
-                with st.form("refund_update_form"):
-                    
-                    updated_paid = st.number_input(
-                        "Update Total Paid Amount (Rs.)",
-                        min_value=0.0,
-                        value=float(p_data.get('paid_amount', 0)),
-                        step=500.0,
-                        help="Increase this amount when patient pays remaining balance."
-                    )
-                    
-                    new_refund = st.number_input(
-                        "Update Total Refund Amount (Rs.)",
-                        min_value=0.0,
-                        value=float(p_data.get('refund', 0)),
-                        step=500.0
-                    )
-                    
-                    submit_adjustments = st.form_submit_button("Save Changes to Cloud")
-                    
-                    if submit_adjustments:
-                        
-                        actual_amount = float(p_data.get('actual_amount', 0))
-                        
-                        # Recalculate balance correctly
-                        updated_balance = actual_amount - updated_paid + new_refund
-                        
-                        log_ref.document(target_receipt).update({
-                            "paid_amount": updated_paid,
-                            "refund": new_refund,
-                            "balance": updated_balance
-                        })
-                        
-                        st.success(
-                            f"Ledger updated successfully for {p_data.get('patient_name','')}! "
-                            f"New Paid Total: Rs. {updated_paid:,.0f} | "
-                            f"Remaining Balance: Rs. {updated_balance:,.0f}"
-                        )
-                        
-                        st.rerun()
-            else:
-                st.warning("No matching patient record found for selected receipt.")
+                st.success(f"Updated successfully! New Balance: Rs. {updated_balance:,.0f}")
+                
+                # Refresh page to reflect changes
+                st.rerun()
+                
     else:
-        st.info("No logs present to process adjustments.")
+        st.warning("No matching patient record found for selected receipt.")
+        
+else:
+    st.info("No logs present to process adjustments.")
 # ----------------------------------------------------
 # PAGE 3: DATE-RANGE AUDITOR ARCHIVE (FIXED)
 # ----------------------------------------------------
