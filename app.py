@@ -17,8 +17,13 @@ st.set_page_config(
 # ----------------------------------------------------
 # 🇵🇰 PAKISTAN STANDARD TIME (PKT)
 # ----------------------------------------------------
-pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
-current_time_pkt = datetime.now(pkt_zone)
+utc_now = datetime.now(zoneinfo.ZoneInfo("UTC"))
+
+pkt_time = utc_now.astimezone(
+    zoneinfo.ZoneInfo("Asia/Karachi")
+)
+
+display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
 
 current_time_local = datetime.now()
 
