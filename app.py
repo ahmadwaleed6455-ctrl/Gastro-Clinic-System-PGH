@@ -14,25 +14,21 @@ st.set_page_config(
     layout="wide"
 )
 
-# ----------------------------------------------------
-# 🇵🇰 TIME SYSTEM (CLOUD SAFE + PKT FIXED)
-# ----------------------------------------------------
+# 1️⃣ Define PKT timezone
 pkt_zone = zoneinfo.ZoneInfo("Asia/Karachi")
 
-# Always start from UTC (safe for cloud servers)
+# 2️⃣ Always get current time in UTC (cloud safe)
 utc_now = datetime.now(timezone.utc)
 
-# Convert UTC → Pakistan Time
+# 3️⃣ Convert UTC → PKT
 pkt_time = utc_now.astimezone(pkt_zone)
 
-# FINAL DISPLAY FORMAT (USE THIS IN RECEIPTS)
+# 4️⃣ Format for display in receipts, forms, dashboards
 display_datetime_form = pkt_time.strftime("%d-%m-%Y %I:%M %p")
-
-# Clean system date string used to group entries in Firestore
-current_date_str = pkt_time.strftime("%Y-%m-%d")
-
-# Receipt date suffix
 receipt_date_suffix = pkt_time.strftime("%d%m%Y")
+
+# ✅ Use this everywhere in your app
+st.write(f"🕒 PKT Time: {display_datetime_form}")
 
 # ----------------------------------------------------
 # 🔐 FIREBASE CONNECTION
